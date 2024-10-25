@@ -23,7 +23,8 @@ prepare () {
     test/fasta_base/false_base_2/*
 }
 
-#prepare
+prepare
+
 #exec
 python pipeline.py \
     -i test/test.fna \

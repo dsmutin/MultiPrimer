@@ -75,6 +75,7 @@ mkdir -p $tmp
 
 echo "Primer check initiated"
 
+# count false mappers
 for filter_files in "$@"; do
     bn=$(basename $filter_files)
     echo " - prepare false hits: ${bn%.*}"
@@ -82,23 +83,25 @@ for filter_files in "$@"; do
 done
 
 echo " - count occurences"
-
+#filter true mappers 
 filter $true_file > $tmp/filtered.tmp
 
+#unique hitters 
 sort $tmp/filtered.tmp > $tmp/sorted_1.tmp
 count $tmp/sorted_1.tmp | sort > $tmp/count.tmp
-echo " - $(wc -l < $tmp/count.tmp) primers found"
+echo " --" $(wc -l < $tmp/count.tmp) primers sucsessfully mapped
+
+#multimapping check 
+echo " - multimapping check"
 
 join $tmp/sorted_1.tmp $tmp/count.tmp | sort -k8 -nr > $tmp/amount_sorted.tmp
 
-echo " - multimapping check"
-# sort | join | concat | count | sort by amounts | keep occur > 2
 sort $tmp/filtered.tmp -k2 > $tmp/sorted_2.tmp
 sort $contig_table -k2 > $tmp/sorted_contig.tmp
 join -1 2 -2 2 $tmp/sorted_contig.tmp $tmp/sorted_2.tmp |\
     awk '{print $2 "---" $3}' > $tmp/sorted_with_genomes.tmp
-count $tmp/sorted_with_genomes.tmp > $tmp/sorted_counts
-sed 's/---/\t/g' $tmp/sorted_counts |\
+count $tmp/sorted_with_genomes.tmp > $tmp/sorted_counts.tmp
+sed 's/---/\t/g' $tmp/sorted_counts.tmp |\
     awk '{if ($3 > "'$multimap_max'") print $2}' >> $tmp/filter_files.tmp
 
 # concat
