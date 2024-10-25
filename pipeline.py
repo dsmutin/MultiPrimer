@@ -182,6 +182,10 @@ parser.add_argument("-S", "--set_size",
                     default=10, type=int,
                     help="Size of mutated primers per primer")
 
+parser.add_argument("-A", "--append",
+                    default=True, type=bool,
+                    help="Append best primers to array in evolutionary algoritm")
+
 # Exec
 parser.add_argument("--primer3",
                     required=False,
@@ -255,25 +259,25 @@ parser.add_argument("--evalue",
 # primer_check template
 parser.add_argument("--max_mismatch",
                     default="5",
-                    help="blastn template option. maximum avialable mismatch")
+                    help="primer_check template option. maximum avialable mismatch")
 
 parser.add_argument("--multimap_max",
                     default="1",
-                    help="blastn template option. fraction of matches")
+                    help="primer_check template option. maximum multimapped hits")
 
 parser.add_argument("--negative_max",
                     default="0",
-                    help="blastn template option. fraction of matches")
+                    help="primer_check template option. maximum negative hits")
 
 parser.add_argument("--min_ident",
                     default="70",
-                    help="blastn template option. fraction of matches")
+                    help="primer_check template option. minimal identity, percent")
 
 args = parser.parse_args()
 
 
 # 1. Initial set generation ----
-print("\n---- MultiPrimer v.0.1 ----\n")
+print("\n---- MultiPrimer v.0.2 ----\n")
 print("Arguments passed")
 
 script_path = os.path.dirname(os.path.realpath(__file__)) + "/scripts/"
@@ -376,9 +380,12 @@ for iter in range(1, args.iterations+1):
     subprocess.run(primer_check_iter, shell=True)
 
     # 4. primers matching ----
-    primer_out = pd.read_table(out_dir(iter) + "clear_hits.tsv",
-                               sep=' ', header=None)
-
+    try:
+        primer_out = pd.read_table(out_dir(iter) + "clear_hits.tsv",
+                                sep=' ', header=None)
+    except:
+        InterruptedError("Empty file after filtration, try to use other primer_check properties and review false databases")
+    
     primer_vals = primer_out.iloc[:, 0].value_counts()
 
     primer_list = list(set(primer_out.iloc[:, 0]))
@@ -392,6 +399,7 @@ for iter in range(1, args.iterations+1):
     primer_list_hash = [hash(_) for _ in primer_list]
 
     print("Maximum hits:", primer_vals.iloc[0])
+    print("Mean hits:", round(sum(primer_vals)/len(primer_vals), 1))
 
     # grep in primers.fa from previous iter
     fasta = open(out_dir(iter-1) + "output.fa", "r")
@@ -410,10 +418,13 @@ for iter in range(1, args.iterations+1):
 
     # 5*. mutations ----
     if iter != args.iterations:  # (if not final)
-        seqs_mutated = seqs.copy()
+        if args.append:
+            seqs_mutated = seqs.copy()
+        else:
+            seqs_mutated = dict()
         for seqs_unique in seqs.keys():
             for seqs_iter in range(args.set_size):
-                init_seq = seqs_mutated[seqs_unique]
+                init_seq = seqs[seqs_unique]
                 mutated_seq = init_seq
                 while init_seq == mutated_seq:
                     mutated_seq = "".join([mutate_seq(_) for _ in init_seq])

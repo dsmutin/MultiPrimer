@@ -7,5 +7,4 @@ do
 done
 
 awk '/^>/ {printf("\n%s\n",$0);next; } { printf("%s",$0);}  END {printf("\n");}' \
-    < $input |\
-    sed -e "s/ .*//g" > $output
+    < $input | sed "s/ .*//g" | sed "s/>.*[|]/>/g" > $output 
