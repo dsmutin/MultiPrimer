@@ -3,6 +3,10 @@ prepare () {
     rm test/contigs
     rm -r test/blastn_base
     rm -r test/output
+
+    gzip -d test/blastn_base/true_base/*
+    gzip -d test/fasta_base/false_base_1/*
+    gzip -d test/fasta_base/false_base_2/*
     
     bash prep_db.sh \
     -n test/blastn_base/true_base \
