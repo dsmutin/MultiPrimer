@@ -233,7 +233,7 @@ parser.add_argument("--PRIMER_PRODUCT_SIZE_RANGE",
 
 # Blastn template
 parser.add_argument("--word_size",
-                    default="11",
+                    default="7",
                     help="blastn template option")
 
 parser.add_argument("--reward",
@@ -277,7 +277,7 @@ args = parser.parse_args()
 
 
 # 1. Initial set generation ----
-print("\n---- MultiPrimer v.0.2 ----\n")
+print("\n---- MultiPrimer v.0.3 ----\n")
 print("Arguments passed")
 
 script_path = os.path.dirname(os.path.realpath(__file__)) + "/scripts/"
@@ -326,6 +326,16 @@ if args.add_set is not None:
     add_fasta = "cat " + args.add_set + " >> " + out_dir(0) + "output.fa"
     subprocess.run(add_fasta, shell=True, executable="/bin/bash")
 
+# Merge left and right
+def merge_primers_iter(iter):
+    mpi = "python " + script_path + "primer_merge.py " + \
+        " -i " + out_dir(iter) + "output.fa" + \
+        " -t " + out_dir(iter) + "fasta_table.tsv"  + \
+        " -o " + out_dir(iter) + "merged.fa"
+    return(mpi)
+
+subprocess.run(merge_primers_iter(0), shell = True)
+
 # < evolutionary algorithm >
 
 # blastn command
@@ -353,7 +363,7 @@ for iter in range(1, args.iterations+1):
     os.makedirs(out_dir(iter), exist_ok=True)
 
     # 2. blastn ----
-    blastn_iter = blastn + " -query " + out_dir(iter-1) + "output.fa"
+    blastn_iter = blastn + " -query " + out_dir(iter-1) + "merged.fa"
 
     # true base
     blastn_db = blastn_iter + " -db " + args.true_base + \
@@ -389,13 +399,6 @@ for iter in range(1, args.iterations+1):
     primer_vals = primer_out.iloc[:, 0].value_counts()
 
     primer_list = list(set(primer_out.iloc[:, 0]))
-
-    paired_primers = []
-    for _ in primer_list.copy():
-        cp = pairing(_)
-        paired_primers += [cp[0]] + [cp[1]]
-
-    primer_list = list(set(paired_primers))
     primer_list_hash = [hash(_) for _ in primer_list]
 
     print("Maximum hits:", primer_vals.iloc[0])
@@ -406,7 +409,8 @@ for iter in range(1, args.iterations+1):
     seqs = {}
     for iter_line, line in enumerate(fasta):
         if iter_line % 2 == 0:
-            if np.isin(hash(line[1:-1]), primer_list_hash):
+            line_clear = re.sub(r'(_LEFT|_RIGHT)$', '', line[1:-1])
+            if np.isin(hash(line_clear), primer_list_hash):
                 keep = True
                 line_name = line[1:-1]
             else:
@@ -435,12 +439,20 @@ for iter in range(1, args.iterations+1):
         for fname in seqs_mutated.keys():
             fasta.write(">" + fname +"\n"+ seqs_mutated[fname]+"\n")
         fasta.close()
+        
+        subprocess.run(merge_primers_iter(iter), shell = True)
+        
         print("Done")
+        
+    # get merged
 
 # </ evolutionary algorithm >
 # 6. output ----
+
 fasta = open(args.output + "/output.fa", "w")
-for fname in seqs.keys():
-    fasta.write(">"+fname+"\n" + seqs[fname]+"\n")
+for fname in sorted(seqs.keys()):
+    seqs_hits = str(primer_vals.loc[re.sub(r'(_LEFT|_RIGHT)$', '', fname)])
+    fasta.write(">"+"H"+seqs_hits+"_"+fname+"\n" + seqs[fname]+"\n")
+    
 fasta.close()
 print("Done")
